@@ -2,7 +2,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User.js');
 
 const isAuth = async (token) => {
-    let auth = '', msg = '', u = '';
+    let auth = '', msg = '';
     if (token) {
         jwt.verify(token, 'MysecretEPL1', (err, decodedToken) => {
           if (err) {
@@ -62,8 +62,8 @@ const requireManager= (req, res, next) => {
             if (!result.auth){
                 res.status(401).json({msg: result.msg});
             }
-            else if(result.msg.role === 'Manager') {
-                res.locals.user = result.msg;
+            else if(result.msg.role === 'Manager' && result.msg.authenticated == true) {
+                //res.locals.user = result.msg;
                 next();
             }
             else {
@@ -86,7 +86,7 @@ const requireAdmin= (req, res, next) => {
                 res.status(401).json({msg: result.msg});
             }
             else if(result.msg.role === 'SA') {
-                res.locals.user = result.msg;
+                //res.locals.user = result.msg;
                 next();
             }
             else {
