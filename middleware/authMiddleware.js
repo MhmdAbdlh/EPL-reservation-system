@@ -33,11 +33,11 @@ const isAuth = async (token) => {
 
 // are you autheticated?
 const requireAuth = (req, res, next) => {
-    if (!req.cookies || !req.cookies.jwt){
+    if (!req.headers || !req.headers.jwt) {
         res.status(401).json({msg: 'UnAuthorized'});
     }
     else{
-        const authInfo = isAuth(req.cookies.jwt);
+        const authInfo = isAuth(req.headers.jwt);
         authInfo.then((result) => {
             if (!result.auth){
                 res.status(401).json({msg: result.msg});

@@ -43,10 +43,12 @@ const sign_up = async (req, res) =>{
 
 //log in
 const log_in = async (req, res) =>{
+    res.setHeader('Access-Control-Expose-Headers', 'jwt');
     try{
         const user = await User.login(req.body)
-        res.cookie('jwt', genToken(user._id), { httpOnly: false, maxAge: maxAge * 1000 });
-        //res.setHeader('Access-Control-Allow-Origin', 'https://192.166.1.7:3000');
+        //res.cookie('jwt', genToken(user._id), { httpOnly: false, maxAge: maxAge * 1000, sameSite: 'none', secure: true });
+        res.setHeader('jwt', genToken(user._id));
+        //res.setHeader('x-Trigger', 'CORS');
         //const jwt = genToken(user._id);
         res.json({ msg: 'logged_in'});
     }
@@ -69,13 +71,18 @@ const get_info = async (req, res) => {
 const edit_info = async (req, res) => {
     let user = JSON.parse(JSON.stringify(res.locals.user));
     delete res.locals.user;
-    const auth = await bcrypt.compare(req.body.old_password, user.password);
-    delete req.body.old_password;
+    const auth = await bcrypt.compare(req.body.password, user.password);
+    console.log(auth);
+    delete req.body.password;
     if (!auth) {
         res.status(400).json({msg: "Wrong Password. Update Failed!"});
         return;
     }
     else {
+        delete req.body.username;
+        delete req.body.role;
+        delete req.body.email;
+        delete req.body.password;
         await User.findOneAndUpdate({ username: user.username }, req.body)
         .then((result) => res.json({msg: 'success'}))
         .catch((err) => res.status(400).json({msg: err.message}));
@@ -86,23 +93,24 @@ const edit_info = async (req, res) => {
 const change_password = async (req, res) => {
     let user = JSON.parse(JSON.stringify(res.locals.user));
     delete res.locals.user;
+    //let response = {msg: 'error', old_password: '', new_password: ''}
     const auth = await bcrypt.compare(req.body.old_password, user.password);
     if (!auth) {
-        res.status(400).json({msg: "Wrong Password. Update Failed!"});
+        res.status(400).json({msg: 'error', old_password: "Wrong Password. Update Failed!", new_password: '', confirm: ''});
+        return;
     }
-    else if(req.body.new_password !== req.body.confirm_new_password ) {
-        res.status(400).json({msg: "Please re-confirm your password!"});
+    if(req.body.new_password !== req.body.confirm_new_password ) {
+        res.status(400).json({msg: 'error', confirm: "Please re-confirm your password!", old_password: '', new_password: ''});
+        return;
     }
-    else if (req.body.old_password === req.body.new_password) {
-        res.status(400).json({msg: "New password can not be exactly as the old one!"});
+    if (req.body.old_password === req.body.new_password) {
+        res.status(400).json({msg: 'error', new_password: "New password cannot be exactly as the old one!", old_password: '', confirm: ''});
+        return;
     }
-    else {
-        const userDoc = await User.findOne({ username: user.username });
-        userDoc.password = req.body.new_password;
-        await userDoc.save().then((result => res.json({msg: 'success'})))
-        .catch((err) => res.status(400).json({msg: "Minimum password length is 8 characters"}));
-    }
-
+    const userDoc = await User.findOne({ username: user.username });
+    userDoc.password = req.body.new_password;
+    await userDoc.save().then((result => res.json({msg: 'success'})))
+    .catch((err) => res.status(400).json({msg: 'error', new_password: "Minimum password length is 8 characters", old_password: '', confirm: ''}));
 }
 
 // fetch all users whether pending or registered

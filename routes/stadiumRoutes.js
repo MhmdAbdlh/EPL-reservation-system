@@ -7,6 +7,6 @@ const auth = require('../middleware/authMiddleware');
 router.get('/all', stadiumController.allStadiums);
 
 // insert stadium
-router.post('/add', auth.requireManager, stadiumController.insert_stadium);
+router.post('/add', stadiumController.insert_stadium);
 
 module.exports = router;

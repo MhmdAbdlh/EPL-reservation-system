@@ -14,6 +14,8 @@ app.use(bodyParser.json())
 app.use(cookieParser());
 //app.use(session({cookie: { secure: false}}));
 app.use(cors({credentials: true}));
+//app.use('/teams/all', cors({'origin': 'http://24ytugaubx'}));
+//app.options(cors({credentials: true}));
 //DB connection string
 const dbURI = 'mongodb+srv://dbUser:EPL12345@cluster0.5kwd4.mongodb.net/EPL_Reservation_System?retryWrites=true&w=majority';
 mongoose.connect(dbURI, { useNewUrlParser: true, useUnifiedTopology: true, useCreateIndex: true, useFindAndModify: false })
