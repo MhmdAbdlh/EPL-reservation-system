@@ -18,4 +18,10 @@ router.post('/add',  matchController.insert_match);
 //edit match
 router.put('/edit', matchController.edit_match);
 
+// reserve seat(s)
+router.post('/reservation', auth.requireAuth, matchController.reserve);
+
+// cancel a reservation
+router.delete('/reservation', auth.requireAuth, matchController.cancelReservation);
+
 module.exports = router;
