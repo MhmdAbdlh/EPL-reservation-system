@@ -27,4 +27,7 @@ router.post('/authenticate', auth.requireAdmin, userController.authenticate);
 // delete a user or ignore authentication
 router.delete('/delete', auth.requireAdmin, userController.delete_user);
 
+// log out
+router.post('/logout', auth.requireAuth, userController.log_out);
+
 module.exports = router;

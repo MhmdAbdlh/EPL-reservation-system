@@ -13,6 +13,7 @@ const genToken = (id) => {
 // sign up
 const sign_up = async (req, res) =>{
     req.body.authenticated = true;
+    req.body.logged_in = false;
     if(req.body.role === 'Manager'){
         req.body.authenticated = false;
     }
@@ -45,12 +46,14 @@ const sign_up = async (req, res) =>{
 const log_in = async (req, res) =>{
     res.setHeader('Access-Control-Expose-Headers', 'jwt');
     try{
-        const user = await User.login(req.body)
-        //res.cookie('jwt', genToken(user._id), { httpOnly: false, maxAge: maxAge * 1000, sameSite: 'none', secure: true });
+        const user = await User.login(req.body);
+        if(user.role == 'Manager' && user.authenticated == false) {
+            res.status(400).json({msg: "Sorry! You aren't authenticated by the site manager yet."});
+            return;
+        }
+        await User.findOneAndUpdate({username: user.username}, {logged_in: true});
         res.setHeader('jwt', genToken(user._id));
-        //res.setHeader('x-Trigger', 'CORS');
-        //const jwt = genToken(user._id);
-        res.json({ msg: 'logged_in'});
+        res.json({ msg: user.role});
     }
     catch(err) {
         res.json({ msg: err.message});
@@ -64,6 +67,7 @@ const get_info = async (req, res) => {
      delete user._id;
      delete user.password;
      delete user.authenticated;
+     delete user.logged_in;
      res.json(user);
 }
 
@@ -148,6 +152,19 @@ const delete_user = async (req, res) => {
     })
     .catch((err) => res.status(400).json({msg: err.message}));
 }
+
+// log out
+const log_out = async (req, res) => {
+    let user = res.locals.user;
+    try {
+        await User.findOneAndUpdate({username: user.username}, {logged_in: false});
+        delete res.locals.user;
+        res.json({msg: 'logged_out'});
+    }
+    catch(err) {
+        res.status(400).json({msg: 'Invalid'});
+    }
+}
 module.exports = {
     sign_up,
     log_in,
@@ -156,5 +173,6 @@ module.exports = {
     change_password,
     get_users,
     authenticate,
-    delete_user
+    delete_user,
+    log_out
 };

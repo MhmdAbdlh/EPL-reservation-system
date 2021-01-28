@@ -28,7 +28,7 @@ const prepareMatches = (matches, res) => {
         .then((result) => {match.homeTeamLogo = result.logo});
         await Team.findOne({name: element.away_team})
         .then((result)=> match.awayTeamLogo = result.logo);
-        match.reservationPercentage = getPercentage (match.lounge);
+        match.reservationPercentage = Math.round(getPercentage (match.lounge));
         delete match.lounge;
         delete match.createdAt;
         delete match.updatedAt;
@@ -42,7 +42,7 @@ const prepareMatches = (matches, res) => {
 // details of all matches timing after now
 const allMatches = async (req, res) => {
     const now = new Date();
-    const matches = await Match.find({time: {$gte: now}})
+    const matches = await Match.find({time: {$gte: now}}).sort({'time': -1})
     .then((matches) => {
         prepareMatches(matches, res);
     });
@@ -53,7 +53,7 @@ const myMatches = async (req, res) => {
     let user = JSON.parse(JSON.stringify(res.locals.user));
     delete res.locals.user;
     const now = new Date();
-    const matches = await Match.find({time: {$gte: now}, lounge:{$elemMatch: {$elemMatch: {$in: [user._id]}}}})
+    const matches = await Match.find({time: {$gte: now}, lounge:{$elemMatch: {$elemMatch: {$in: [user._id]}}}}).sort({'time': -1})
     .then((matches) => {
         prepareMatches(matches, res);
     })
@@ -74,6 +74,15 @@ const validate_request = async (req, res) => {
         return false;
     }
     const matchTime = new Date(req.body.time);
+    let lowerLimit = new Date(req.body.time);
+    let upperLimit = new Date(req.body.time);
+    lowerLimit.setHours(lowerLimit.getHours() - 2);
+    upperLimit.setHours(upperLimit.getHours() + 2);
+    const isReserved = await Match.findOne({match_venue: venue.name, time: {$lte: upperLimit}, time: {$gte: lowerLimit}});
+    if (isReserved && req._id && req._id != isReserved._id) {
+        res.status(400).json({msg: 'Stadium is unAvaialble on this time!'});
+        return false;
+    }
     if (matchTime.getTime() < new Date().getTime())  {
         res.status(400).json({msg: 'Invalid Time Slot!'});
         return false;
@@ -106,22 +115,17 @@ const edit_match = async (req, res) => {
         if(!result) {
             throw Error('Not Found!')
         }
-        if (getPercentage(result.lounge) > 0) {
-            res.status(400).json({msg: "You cannot edit this match. Some tickets are already sold!"});
-            return;
-        }
         const venue = await validate_request(req, res);
         if (!venue) {
             return;
         }
-        const update = await Match.findByIdAndUpdate(id, req.body)
-        .then((result) => {
-            if(!result) {
-                throw Error('Not Found');
-            }
-            res.json({msg: 'Updated'})
-        })
-        .catch((err) => res.status(400).json({msg: err.message}));
+        if(result.match_venue != req.body.match_venue && getPercentage(result.lounge) > 0)
+            res.status(400).json({msg: "You cannot edit match venue while some tickets are already sold!"});
+        else {
+            await Match.findByIdAndUpdate(id, req.body)
+            .then((result) => res.json({msg: 'Updated'}))
+            .catch((err)=> res.status(400).json({msg: "error"}));   
+        }   
     })
     .catch((err) => res.status(400).json({msg: err.message}));
 }
@@ -130,7 +134,7 @@ const edit_match = async (req, res) => {
 const get_grid = async (req, res) => {
     let user = JSON.parse(JSON.stringify(res.locals.user));
     delete res.locals.user;
-    const matchID = req.body.matchID;
+    const matchID = req.query.matchId;
     const userID = user._id;
     const matches = await Match.findOne({"_id": matchID}, {"lounge": 1})
     .then((matches) => {
@@ -150,7 +154,7 @@ const get_grid = async (req, res) => {
                 }
             }
         }
-        res.json({id: matches._id, grid: response});
+        res.json({grid: response});
     })
     .catch((err) => res.status(400).json({grid: 'Invalid Request'}))
 }

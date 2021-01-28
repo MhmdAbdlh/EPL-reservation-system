@@ -13,9 +13,9 @@ router.get('/my-matches', auth.requireAuth, matchController.myMatches);
 router.get('/grid', auth.requireAuth, matchController.get_grid);
 
 // add match
-router.post('/add',  matchController.insert_match);
+router.post('/add', auth.requireManager, matchController.insert_match);
 
 //edit match
-router.put('/edit', matchController.edit_match);
+router.put('/edit', auth.requireManager, matchController.edit_match);
 
 module.exports = router;

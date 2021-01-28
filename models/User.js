@@ -45,10 +45,14 @@ const userSchema = new schema({
     },
     role: {
         type: String,
-        enum: ['Manager', 'Fan'],
+        enum: ['Manager', 'Fan', 'SA'],
         required: true
     },
     authenticated: {
+        type: Boolean,
+        default: false
+    },
+    logged_in: {
         type: Boolean,
         default: false
     }
