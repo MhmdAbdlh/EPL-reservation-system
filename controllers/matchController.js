@@ -1,6 +1,7 @@
 const Match = require('../models/Match');
 const Team = require('../models/Team');
 const Stadium = require('../models/Stadium');
+const Reservation = require('../models/Reservation');
 
 // utility function, calculate percentage or reservation of a certain match
 const getPercentage = (lounge) => {
@@ -37,6 +38,11 @@ const prepareMatches = (matches, res) => {
             res.json({matches: response});
         }
     });
+}
+
+const daysDiff = (matchDate, cancellationDate) => {
+    const diff = matchDate - cancellationDate;  // difference in millisecondsd
+    return (diff / (1000*60*60*24));  //difference in days
 }
 
 // details of all matches timing after now
@@ -158,10 +164,82 @@ const get_grid = async (req, res) => {
     })
     .catch((err) => res.status(400).json({grid: 'Invalid Request'}))
 }
+
+// reserve one or more seats for a certain match
+const reserve = (req, res) => {
+    const user = JSON.parse(JSON.stringify(res.locals.user));
+    const userID = user._id;
+    const matchID = req.body.matchID;
+    let match = Match.findById(matchID)
+    .then((match) => {
+        if (!match) {
+            throw Error('Match not found!');
+        }
+        const seats = req.body.seats;
+        // TODO: check if any of the seats is taken
+        //   if so, return error
+        //   if not, mark them as reserved
+        Reservation.create(reservation)
+        .then((result) => {
+            res.json({
+                id: result._id
+            });
+        })
+        .catch((err) => {
+            res.status(400).json({
+                msg: err.message
+            });
+        });
+    })
+}
+
+// cancel a reservation
+const cancelReservation = (req, res) => {
+    const reservationID = req.body.id;
+    const user = JSON.parse(JSON.stringify(res.locals.user));
+    const userID = user._id;
+    const matchID = req.body.matchID;
+    const reservation = Reservation.findById(reservationID)
+    .then((reservation) => {
+        if (!reservation) {
+            throw Error('Reservation not found!');
+        }
+        const cancellationDate = new Date();
+        const match = Match.findById(matchID);
+        const matchDate = new Date(match.time);
+        if (daysDiff(matchDate, cancellationDate) >= 3) {
+            Reservation.findOneAndDelete({'_id': reservationID})
+            .then((result) => {
+                if (result != null) {
+                    res.json({
+                        msg: 'cancelled'
+                    });
+                    // TODO: mark seats as vacant
+                }
+                else {
+                    res.json({
+                        msg: 'failed to cancel'
+                    });
+                }
+            })
+            .catch((err) => {
+                res.status(400).json({msg: err.message})
+            });
+        }
+        else {
+            res.json({
+                msg: 'Too late to cancel.'
+            })
+        }
+    })
+}
+
 module.exports = {
     allMatches,
     myMatches,
     insert_match,
     edit_match, 
-    get_grid
+    get_grid,
+    reserve,
+    cancelReservation
 };
