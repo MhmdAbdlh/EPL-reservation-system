@@ -22,7 +22,7 @@ router.put('/change-password', auth.requireAuth, userController.change_password)
 router.get('/allUsers', auth.requireAdmin, userController.get_users);
 
 // authenticate user
-router.post('/authenticate', auth.requireAdmin, userController.authenticate);
+router.put('/authenticate', auth.requireAdmin, userController.authenticate);
 
 // delete a user or ignore authentication
 router.delete('/delete', auth.requireAdmin, userController.delete_user);

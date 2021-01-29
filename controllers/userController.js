@@ -48,7 +48,7 @@ const log_in = async (req, res) =>{
     try{
         const user = await User.login(req.body);
         if(user.role == 'Manager' && user.authenticated == false) {
-            res.status(400).json({msg: "Sorry! You aren't authenticated by the site manager yet."});
+            res.status(400).json({msg: "Sorry! You aren't authenticated by the site admin yet."});
             return;
         }
         await User.findOneAndUpdate({username: user.username}, {logged_in: true});
@@ -119,15 +119,16 @@ const change_password = async (req, res) => {
 
 // fetch all users whether pending or registered
 const get_users = async (req, res) => {
-    const type = req.query.type;
-    if (type !== 'registered' && type !== 'pending') {
-        res.status(400).json({msg: 'Invalid Request'});
-        return;
-    }
-    const isRegistered = type === 'registered';
-    await User.find({"authenticated": isRegistered}, {"_id": 0, "username": 1})
-    .then((result) => res.json({users: result}))
+    const pending = await User.find({"authenticated": false}, {"_id": 0, "username": 1})
+    .then((result) => { return result; })
     .catch((err) => res.status(400).json({users: err.message}));
+    const registered = await User.find({"role": {$ne: "SA"}, "authenticated": true}, {"_id": 0, "username": 1, "role": 1})
+    .then((result) => { return result; })
+    .catch((err) => res.status(400).json({users: err.message}));
+    res.json({
+        pending,
+        registered
+    });
 }
 
 // authenticate user given username

@@ -24,4 +24,7 @@ router.post('/reservation', auth.requireAuth, matchController.reserve);
 // cancel a reservation
 router.delete('/reservation', auth.requireAuth, matchController.cancelReservation);
 
+// details of a certain match
+router.get('/:id', matchController.matchInfo);
+
 module.exports = router;

@@ -40,9 +40,63 @@ const prepareMatches = (matches, res) => {
     });
 }
 
+// calc difference between two dates in days
 const daysDiff = (matchDate, cancellationDate) => {
     const diff = matchDate - cancellationDate;  // difference in millisecondsd
     return (diff / (1000*60*60*24));  //difference in days
+}
+
+// get the row of the seat and the index of the seat in the row from the seat ID 
+const parseSeat = async (seat, matchID) => {
+    const match = await Match.findById(matchID)
+    .then((match) => {
+        if (!match) {
+            throw Error('Match not found!');
+        }
+        return match;
+    })
+    .catch((err) => {
+        throw err;
+    });
+    
+    const venue = await Stadium.findOne({name: match.match_venue})
+    .then((venue) => {
+        if (!venue) {
+            throw Error(`Venue not found!!`);
+        }
+        return venue;
+    })
+    .catch((err) => {
+        throw err;
+    });
+    
+    const venueRows = venue.numRows;
+    const venueSPR = venue.seats_per_row;
+
+    const seatRow = Math.floor(seat / venueSPR);
+    const seatNo = seat % venueSPR;
+
+    if (seatRow >= venueRows) {
+        throw Error('Invalid seat!');
+    }
+
+    return { lounge: match.lounge, seatRow, seatNo };
+}
+
+// Update the lounge
+const updateLounge = async (matchID, seatRow, seatNo, userID) => {
+    const lounge = await Match.findById(matchID)
+    .then((match) => {
+        if (!match) {
+            throw Error('Match not found..');
+        }
+        return match.lounge;
+    })
+    .catch((err) => {
+        throw err;
+    });
+    lounge[seatRow][seatNo] = userID;
+    await Match.findOneAndUpdate({_id: matchID}, {lounge: lounge});
 }
 
 // details of all matches timing after now
@@ -64,6 +118,24 @@ const myMatches = async (req, res) => {
         prepareMatches(matches, res);
     })
     .catch((err) => res.status(400).json(err.msg));
+}
+
+// details of a certain match given its ID
+const matchInfo = async (req, res) => {
+    const id = req.params.id;
+    const match = await Match.findById(id)
+    .then((match) => {
+        if (!match) {
+            throw Error('Match not found');
+        }
+        const tempList = [match];
+        prepareMatches(tempList, res);
+    })
+    .catch((err) => {
+        res.status(400).json({
+            msg: err.message
+        })
+    });
 }
 
 // uility function for validating match details in add or edit
@@ -165,78 +237,124 @@ const get_grid = async (req, res) => {
     .catch((err) => res.status(400).json({grid: 'Invalid Request'}))
 }
 
-// reserve one or more seats for a certain match
-const reserve = (req, res) => {
-    const user = JSON.parse(JSON.stringify(res.locals.user));
-    const userID = user._id;
-    const matchID = req.body.matchID;
-    let match = Match.findById(matchID)
-    .then((match) => {
-        if (!match) {
-            throw Error('Match not found!');
+// Reserve one or more seats for a certain match
+const reserve = async (req, res) => {
+    try {
+        const user = JSON.parse(JSON.stringify(res.locals.user));
+        const userID = user._id;
+        const matchID = req.body.matchId;
+        const seat = parseInt(req.body.seatId);
+        const CCN = req.body.creditNo;
+        const PIN = req.body.pin;
+        const { lounge, seatRow, seatNo } = await parseSeat(seat, matchID);
+        
+        // Seat should be vacant
+        if (lounge[seatRow][seatNo] !== 'null') {
+            throw Error('Seat is already taken');
         }
-        const seats = req.body.seats;
-        // TODO: check if any of the seats is taken
-        //   if so, return error
-        //   if not, mark them as reserved
-        Reservation.create(reservation)
+
+        // The same user should not have another reservation for a DIFFERENT match within 2 hours of this match
+        const matchDate = await Match.findById(matchID).then((match) => { return new Date(match.time); });
+        const lowerLimit = new Date(matchDate.getTime() - (2*60*60*1000));
+        const upperLimit = new Date(matchDate.getTime() + (2*60*60*1000));    
+        await Match.aggregate([
+            {$project:{
+                _id: { "$toString": "$_id" },
+                time: 1
+            }},
+            {$lookup:{
+                'from': Reservation.collection.name,
+                'localField': '_id',
+                'foreignField': 'matchID',
+                'as': 'bookings'
+            }},
+            {$match:{
+                'bookings.userID': userID,
+                'bookings.matchID': {$ne: matchID},
+                'time': {
+                    $lt: upperLimit,
+                    $gte: lowerLimit
+                }
+            }}
+        ])
         .then((result) => {
+            if (result.length > 0) {
+                throw Error('Cannot reserve seats at 2 different games within 2 hours of each other.');
+            }
+        });
+
+        // Valid reservation
+        const reservation = {
+            userID,
+            matchID,
+            CCN,
+            PIN,
+            seatRow,
+            seatNo
+        };
+        Reservation.create(reservation)
+        .then(async (result) => {
+            await updateLounge(matchID, seatRow, seatNo, userID);
             res.json({
-                id: result._id
-            });
-        })
-        .catch((err) => {
-            res.status(400).json({
-                msg: err.message
+                ticketId: result._id
             });
         });
-    })
+    }
+    catch(err) {
+        res.status(400).json({msg: err.message});
+    }
 }
 
-// cancel a reservation
-const cancelReservation = (req, res) => {
-    const reservationID = req.body.id;
-    const user = JSON.parse(JSON.stringify(res.locals.user));
-    const userID = user._id;
-    const matchID = req.body.matchID;
-    const reservation = Reservation.findById(reservationID)
-    .then((reservation) => {
-        if (!reservation) {
-            throw Error('Reservation not found!');
-        }
+// Cancel a reservation
+const cancelReservation = async (req, res) => {
+    try {
+        const user = JSON.parse(JSON.stringify(res.locals.user));
+        const userID = user._id;
+        const matchID = req.body.matchId;
+        const seat = parseInt(req.body.seatId);
+
+        const { seatRow, seatNo } = await parseSeat(seat, matchID);
+
+        // The reservation data should match those stored 
+        const filter = {userID, matchID, seatRow, seatNo};
+        const reservation = await Reservation.findOne(filter)
+        .then(async (reservation) => {
+            if (!reservation) {
+                throw Error('Reservation not found!');
+            }
+        });
+        
+        // Cannot cancel a reservation less than 3 days before the match starts
         const cancellationDate = new Date();
-        const match = Match.findById(matchID);
-        const matchDate = new Date(match.time);
-        if (daysDiff(matchDate, cancellationDate) >= 3) {
-            Reservation.findOneAndDelete({'_id': reservationID})
-            .then((result) => {
-                if (result != null) {
-                    res.json({
-                        msg: 'cancelled'
-                    });
-                    // TODO: mark seats as vacant
-                }
-                else {
-                    res.json({
-                        msg: 'failed to cancel'
-                    });
-                }
-            })
-            .catch((err) => {
-                res.status(400).json({msg: err.message})
-            });
+        const match = await Match.findById(matchID).then((match) => { return match; });
+        const matchDate = match.time;
+        if (daysDiff(matchDate, cancellationDate) < 3) {
+            throw Error('Too late to cancel.');
         }
-        else {
-            res.json({
-                msg: 'Too late to cancel.'
-            })
-        }
-    })
+        
+        // Cancellation valid
+        Reservation.findOneAndDelete(filter)
+        .then(async (result) => {
+            if (result != null) {
+                await updateLounge(matchID, seatRow, seatNo, 'null');
+                res.json({
+                    msg: 'Reservation cancelled'
+                });
+            }
+            else {
+                throw Error('Failed to cancel reservation');
+            }
+        });
+    }
+    catch(err) {
+        res.status(400).json({msg: err.message});
+    };
 }
 
 module.exports = {
     allMatches,
     myMatches,
+    matchInfo,
     insert_match,
     edit_match, 
     get_grid,

@@ -7,6 +7,7 @@ const matchRouter = require('./routes/matchRoutes');
 const stadiumRouter = require('./routes/stadiumRoutes');
 const teamRouter = require('./routes/teamRoutes');
 const cors = require('cors');
+// const User = require('./models/User');
 // Server running
 const app = express();
 app.use(bodyParser.urlencoded({extended: true}))
@@ -53,3 +54,23 @@ app.get('/hkjh', (req, res) => {
       console.log(err);
     });
 });
+// app.post('/sa', (req, res) => {
+//   const sa = {
+//     username: 'admin',
+//     password: 'admin123',
+//     first_name: 'admin',
+//     last_name: 'admin',
+//     birthdate: new Date('1998-1-1'),
+//     gender: 'Male',
+//     city: 'Cairo',
+//     address: '',
+//     email: 'admin@epl.com',
+//     role: 'SA',
+//     authenticated: true,
+//     logged_in: true
+//   };
+//   User.create(sa);
+//   res.json({
+//     msg: 'confirmed'
+//   })
+// })

@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const schema = mongoose.schema;
+const schema = mongoose.Schema;
 const reservationSchema = new schema ({
     userID: {
         type: String,
@@ -17,14 +17,16 @@ const reservationSchema = new schema ({
         type: Number,
         required: true
     },
-    seats: {
-        type: [[Number]],
+    seatRow: {
+        type: Number,
+        required: true
+    },
+    seatNo: {
+        type: Number,
         required: true
     }
-});
+}, {timestamps: true});
 
 const Reservation = mongoose.model('Reservation', reservationSchema);
 
-module.exports = {
-    Reservation
-}
+module.exports = Reservation;
