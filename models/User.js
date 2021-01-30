@@ -23,7 +23,9 @@ const userSchema = new schema({
     },
     birthdate: {
         type: Date,
-        required: true
+        required: true,
+        min: new Date(1900, 0, 1),
+        max: new Date(new Date().getFullYear() - 16, new Date().getMonth(), new Date().getDate())
     },
     gender: {
         type: String,

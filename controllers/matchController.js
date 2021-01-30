@@ -23,7 +23,7 @@ const prepareMatches = (matches, res) => {
         res.json({matches: response});
         return;
     }
-    matches.forEach(async(element, i) => {
+    matches.forEach(async(element) => {
         let match = JSON.parse(JSON.stringify(element));
         await Team.findOne({name: element.home_team})
         .then((result) => {match.homeTeamLogo = result.logo});
@@ -33,8 +33,9 @@ const prepareMatches = (matches, res) => {
         delete match.lounge;
         delete match.createdAt;
         delete match.updatedAt;
+        delete match.__v;
         response.push(match);
-        if(i == matches.length-1) {
+        if(response.length == matches.length) {
             res.json({matches: response});
         }
     });
@@ -105,6 +106,7 @@ const allMatches = async (req, res) => {
     const matches = await Match.find({time: {$gte: now}}).sort({'time': -1})
     .then((matches) => {
         prepareMatches(matches, res);
+        // res.json(matches);
     });
 }
 

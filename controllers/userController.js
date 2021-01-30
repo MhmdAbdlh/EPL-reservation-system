@@ -19,6 +19,7 @@ const sign_up = async (req, res) =>{
     }
     let response = {msg: 'Invalid Request', username: '', email: '', password: ''}
     let registered = false;
+    const user = new User(req.body);
     await User.create(req.body)
     .then((result) => {registered = true; response = {msg: 'registered', username: 'ok', email: 'ok', password: 'ok'}})
     .catch((err) => {
@@ -33,6 +34,14 @@ const sign_up = async (req, res) =>{
         if (err.message.includes('password')){
             response.password = 'Minimum password length is 8 characters';
         }   
+        if (err.message.includes('birthdate')) {
+            if (err.message.includes('minimum')) {
+                response.birthdate = 'Invalid birthdate';
+            }
+            if (err.message.includes('maximum')) {
+                response.birthdate = 'You must be at least 16 years old to sign up';
+            }
+        }
     });
     if(registered){
         res.json(response);
